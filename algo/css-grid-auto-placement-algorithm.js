@@ -23,7 +23,7 @@ function layout(rows, columns, items) {
   }
   // sort first
   items = sortItems(rows, columns, items);
-  console.dir(`items after sorted`, items);
+  console.dir(`items after sorted`, JSON.stringify(items));
   // render
   let currentColumn = 1;
   let currentRow = 1;
@@ -134,7 +134,9 @@ function layout(rows, columns, items) {
     } = sizing;
     while(rowStart <= rowEnd) {
       while(columnStart <= columnEnd) {
-        result[rowStart - 1][columnStart - 1] = item.id;
+        if (item.gridColumnStart === columnStart) {
+          result[rowStart - 1][columnStart - 1] = item.id;
+        }
         columnStart++;
       }
       rowStart++
@@ -222,15 +224,38 @@ function sortItems(rows, columns, items) {
         currentIndex++;
         item = items[currentIndex];
         if (!item.fixedRow && item.columnSpan < emptyCells) {
-          let willFillCells = item.columnSpan;
-          newItems.push(item);
-          emptyCells -= willFillCells;
-          console.info(`re-sorting, fill item`, item, ` at`, currentIndex);
+          if (item.rowSpan > 1 && (targetItem.expectColumn || 1 + targetItem.columnSpan - 1) > columns) {
+
+            emptyCells = 0;
+            console.info(`re-sorting, not enough space put item ignore empty cells, `, emptyCells);
+          } else {
+            item.gridColumnStart = targetItem.expectColumn + targetItem.columnSpan;
+            item.gridRowStart = currentRow;
+            let willFillCells = item.gridColumnStart + item.columnSpan;
+            newItems.push(item);
+            emptyCells -= willFillCells;
+            currentColumn = item.gridColumnStart + item.columnSpan - 1;
+            currentRow = item.gridRowStart + item.rowSpan - 1;
+            console.info(`re-sorting, fill item`, item, ` at`, currentIndex);
+          }
         } else {
           emptyCells = 0;
         }
       }
     } else {
+      if (currentColumn > columns) {
+        currentColumn = 1;
+        currentRow++;
+      }
+      if (targetItem.gridColumnStart) {
+        currentIndex++;
+        continue;
+      }
+      targetItem.gridColumnStart = currentColumn;
+      targetItem.gridRowStart = currentRow;
+      // for next
+      currentColumn = targetItem.gridColumnStart + targetItem.columnSpan - 1;
+      currentRow = targetItem.gridRowStart + targetItem.rowSpan - 1;
       currentIndex++;
     }
 
