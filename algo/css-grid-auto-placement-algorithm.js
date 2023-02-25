@@ -43,14 +43,19 @@ function layout(rows, columns, items) {
       isFixedRow,
       isFixedColumn,
     } = sizing;
-    putItem(result, item, { currentColumn, currentRow }, sizing)
-    if (!isFixedColumn || (isFixedColumn && currentColumn === columnStart)) {
-      // move point
-      currentColumn = columnEnd;
-    }
-    if (!isFixedRow || (isFixedRow && currentRow === rowStart)) {
-      // move point
-      currentRow = rowEnd;
+    let nextPoint = putItem(JSON.parse(JSON.stringify(result)), item, { currentColumn, currentRow }, sizing)
+    // if (!isFixedColumn || (isFixedColumn && currentColumn === columnStart)) {
+    //   // move point
+    //   currentColumn = nextPoint.pointColumnStart;
+    // }
+    // if (!isFixedRow || (isFixedRow && currentRow === rowStart)) {
+    //   // move point
+    //   currentRow = nextPoint.pointRowStart;
+    // }
+    result = nextPoint.result;
+    if (!isFixedColumn && !isFixedRow) {
+      currentColumn = nextPoint.pointColumnStart;
+      currentRow = nextPoint.pointRowStart;
     }
   });
   // fill 0
@@ -132,7 +137,7 @@ function getSizing(item, { currentRow, currentColumn, rows, columns }) {
   }
 }
 
-function putItem(result, item, currentPosition, sizing, forceUpate) {
+function putItem(result, item, currentPosition, sizing, inRecursion, forceUpate) {
   let {
     currentColumn,
     currentRow
@@ -159,44 +164,72 @@ function putItem(result, item, currentPosition, sizing, forceUpate) {
   }
   pointColumnEnd = pointColumnStart + columnSpan - 1;
   pointRowEnd = pointRowStart + rowSpan - 1;
+  console.group();
+  console.info(`auto placement, try to put `, item, ` at ${pointRowStart}, ${pointColumnStart}, and sizing is`, sizing);
+  let resultCopy = JSON.parse(JSON.stringify(result));
+  let isFirst = true;
   while(pointRowStart <= pointRowEnd) {
     while(pointColumnStart <= pointColumnEnd && pointColumnEnd <= columns) {
-      if (result[rowStart - 1][columnStart - 1] && !forceUpate) {
-
+      if (result[pointRowStart - 1][pointColumnStart - 1] && !forceUpate) {
+        // will move point
         if (!isFixedColumn) {
           if (!isFixedRow) {
-            console.info(`auto placement, not enough placement, move to right`, item);
-            putItem(result, item, {
+            let newPoint = {
               currentColumn: pointColumnStart === columns ? 1 : ++pointColumnStart,
               currentRow: pointColumnStart === columns ? ++pointRowStart : pointRowStart,
-            }, sizing);
-            return; // break;
+            };
+            if (!isFirst) {
+              newPoint = currentPosition;
+            }
+            console.info(`auto placement, not enough placement, move to right`, item, newPoint);
+            
+            putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true);
+            console.groupEnd();
+            continue;
           } else {
             // fixed row
             let cantMoveRight = pointColumnStart + columnSpan - 1 === columns;
-            console.info(`auto placement, not enough placement, move to right`, item, cantMoveRight);
-            putItem(result, item, {
+            console.info(`auto placement, not enough placement, move to right`, item, cantMoveRight, newPoint);
+            let newPoint = {
               currentColumn: pointColumnStart === columns && !cantMoveRight ? 1 : ++pointColumnStart,
               currentRow: pointRowStart,
-            }, sizing, cantMoveRight);
-            return; // break;
+            };
+            if (!isFirst) {
+              newPoint = currentPosition;
+            }
+            putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true, cantMoveRight);
+            console.groupEnd();
+            continue;
           }
         } else if (!isFixedRow) {
-          console.info(`auto placement, not enough placement, move to down`, item);
-          putItem(result, item, {
+          let newPoint = {
             currentColumn: pointColumnStart,
             currentRow: ++pointRowStart,
-          }, sizing);
-          return; //break;
+          };
+          if (!isFirst) {
+            newPoint = currentPosition;
+          }
+          console.info(`auto placement, not enough placement, move to down`, item, newPoint);
+          putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true);
+          console.groupEnd();
+          continue;
         }
       } else {
-
-        console.log(`putitem, `, item, `at ${pointRowStart - 1}, ${pointColumnStart - 1} of `, result);
-        result[pointRowStart - 1][pointColumnStart - 1] = item;
+        isFirst = false;
+        console.log(`putitem, `, item, `at ${pointRowStart - 1}, ${pointColumnStart - 1} of `, JSON.parse(JSON.stringify(resultCopy)));
+        resultCopy[pointRowStart - 1][pointColumnStart - 1] = item;
         pointColumnStart++;
       }
     }
-    pointRowStart++
+    pointRowStart++;
+    pointColumnStart = pointColumnStart - columnSpan;
+  }
+  console.info(`auto placement, end next point ${pointRowStart}, ${pointColumnStart}`);
+  console.groupEnd();
+  return {
+    result: resultCopy,
+    pointRowStart: --pointRowStart,
+    pointColumnStart: --pointColumnStart,
   }
 }
 
@@ -227,4 +260,5 @@ console.log(JSON.stringify(layout(
       id: 5,
     },
   ]
-)))
+)));
+
