@@ -56,13 +56,19 @@ function layout(rows, columns, items) {
     if (!isFixedColumn && !isFixedRow) {
       currentColumn = nextPoint.pointColumnStart;
       currentRow = nextPoint.pointRowStart;
+    } else if (isFixedColumn) {
+      currentColumn = nextPoint.pointColumnStart;
+    // } else if (isFixedRow) {
+    //   currentRow = nextPoint.pointRowStart;
     }
   });
   // fill 0
   for (let row = 0; row < rows; row++) {
     for (let column = 0; column < columns; column++) {
-      if (typeof result[row][column] === "undefined") {
+      if (!result[row][column]) {
         result[row][column] = 0;
+      } else {
+        result[row][column] = result[row][column].id;
       }
     }
   }
@@ -137,7 +143,7 @@ function getSizing(item, { currentRow, currentColumn, rows, columns }) {
   }
 }
 
-function putItem(result, item, currentPosition, sizing, inRecursion, forceUpate) {
+function putItem(result, item, currentPosition, sizing, inRecursion = 0, forceUpate) {
   let {
     currentColumn,
     currentRow
@@ -162,103 +168,131 @@ function putItem(result, item, currentPosition, sizing, inRecursion, forceUpate)
   if (isFixedRow) {
     pointRowStart = rowStart;
   }
-  pointColumnEnd = pointColumnStart + columnSpan - 1;
-  pointRowEnd = pointRowStart + rowSpan - 1;
-  console.group();
+  let pointColumnEnd = pointColumnStart + columnSpan - 1;
+  let pointRowEnd = pointRowStart + rowSpan - 1;
+  !inRecursion && console.group(item.id);
   console.info(`auto placement, try to put `, item, ` at ${pointRowStart}, ${pointColumnStart}, and sizing is`, sizing);
   let resultCopy = JSON.parse(JSON.stringify(result));
   let isFirst = true;
-  while(pointRowStart <= pointRowEnd) {
-    while(pointColumnStart <= pointColumnEnd && pointColumnEnd <= columns) {
-      if (result[pointRowStart - 1][pointColumnStart - 1] && !forceUpate) {
-        // will move point
-        if (!isFixedColumn) {
-          if (!isFixedRow) {
+  if (pointColumnEnd > columns && !isFixedColumn && !isFixedRow && !inRecursion) {
+    let newPoint = {
+      currentColumn: 1,
+      currentRow: pointRowStart + 1
+    };
+    console.info(`\u002b[1;33m auto placement before while, not enough placement, move to right is first`, isFirst, item, newPoint, `recursion ${inRecursion}`);
+    resultCopy = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, inRecursion++).result;
+    // console.groupEnd();
+  } else {
+
+    while(pointRowStart <= pointRowEnd) {
+      while(pointColumnStart <= pointColumnEnd && pointColumnEnd <= columns) {
+        if (result[pointRowStart - 1][pointColumnStart - 1] && !forceUpate) {
+          // will move point
+          if (!isFixedColumn) {
+            if (!isFixedRow) {
+              // auto
+              let newPoint = {
+                currentColumn: pointColumnStart === columns ? 1 : pointColumnStart + 1,
+                currentRow: pointColumnStart === columns ? pointRowStart + 1 : pointRowStart,
+              };
+              if (!isFirst) {
+                newPoint = {
+                  ...currentPosition,
+                  currentColumn: currentPosition.currentColumn + 1
+                };
+              }
+              console.info(`\u001b[1;33m auto placement, not enough placement, move to right is first`,
+                isFirst,
+                item,
+                newPoint,
+                `recursion ${inRecursion}`,
+                `in while (${pointRowStart}, ${pointRowEnd}), (${pointColumnStart}, ${pointColumnEnd})`
+                );
+              
+              resultCopy = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, ++inRecursion).result;
+              // console.groupEnd();
+              break;
+            } else {
+              // fixed row
+              let cantMoveRight = pointColumnStart + columnSpan - 1 === columns;
+              let newPoint = {
+                currentColumn: pointColumnStart === columns && !cantMoveRight ? 1 : ++pointColumnStart,
+                currentRow: pointRowStart,
+              };
+              if (!isFirst) {
+                newPoint = {
+                  ...currentPosition,
+                  currentColumn: currentPosition.currentColumn + 1
+                };;
+              }
+              console.info(`auto placement, not enough placement, move to right`, item, cantMoveRight, newPoint);
+              resultCopy = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true).result;
+              // console.groupEnd();
+              break;
+            }
+          } else if (!isFixedRow) {
             let newPoint = {
-              currentColumn: pointColumnStart === columns ? 1 : ++pointColumnStart,
-              currentRow: pointColumnStart === columns ? ++pointRowStart : pointRowStart,
+              currentColumn: pointColumnStart,
+              currentRow: ++pointRowStart,
             };
             if (!isFirst) {
-              newPoint = currentPosition;
+              newPoint = {
+                ...currentPosition,
+                currentColumn: currentPosition.currentColumn + 1
+              };;
             }
-            console.info(`auto placement, not enough placement, move to right`, item, newPoint);
-            
-            putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true);
-            console.groupEnd();
-            continue;
-          } else {
-            // fixed row
-            let cantMoveRight = pointColumnStart + columnSpan - 1 === columns;
-            console.info(`auto placement, not enough placement, move to right`, item, cantMoveRight, newPoint);
-            let newPoint = {
-              currentColumn: pointColumnStart === columns && !cantMoveRight ? 1 : ++pointColumnStart,
-              currentRow: pointRowStart,
-            };
-            if (!isFirst) {
-              newPoint = currentPosition;
-            }
-            putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true, cantMoveRight);
-            console.groupEnd();
-            continue;
+            console.info(`auto placement, not enough placement, move to down`, item, newPoint);
+            resultCopy = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true).result;
+            // console.groupEnd();
+            break;
           }
-        } else if (!isFixedRow) {
-          let newPoint = {
-            currentColumn: pointColumnStart,
-            currentRow: ++pointRowStart,
-          };
-          if (!isFirst) {
-            newPoint = currentPosition;
-          }
-          console.info(`auto placement, not enough placement, move to down`, item, newPoint);
-          putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true);
-          console.groupEnd();
-          continue;
+        } else {
+          isFirst = false;
+          resultCopy[pointRowStart - 1][pointColumnStart - 1] = item;
+          console.log(`putitem, `, item, `at ${pointRowStart}, ${pointColumnStart} of `, JSON.parse(JSON.stringify(resultCopy)));
+          pointColumnStart++;
         }
-      } else {
-        isFirst = false;
-        console.log(`putitem, `, item, `at ${pointRowStart - 1}, ${pointColumnStart - 1} of `, JSON.parse(JSON.stringify(resultCopy)));
-        resultCopy[pointRowStart - 1][pointColumnStart - 1] = item;
-        pointColumnStart++;
       }
+      pointRowStart++;
+      pointColumnStart = pointColumnStart - columnSpan;
     }
-    pointRowStart++;
-    pointColumnStart = pointColumnStart - columnSpan;
   }
-  console.info(`auto placement, end next point ${pointRowStart}, ${pointColumnStart}`);
+  console.info(`auto placement, end next point ${pointRowEnd}, ${pointColumnEnd}`);
   console.groupEnd();
   return {
     result: resultCopy,
-    pointRowStart: --pointRowStart,
-    pointColumnStart: --pointColumnStart,
+    pointRowStart: pointRowEnd,
+    pointColumnStart: pointColumnEnd + 1,
   }
 }
 
-console.log(JSON.stringify(layout(
+console.log(layout(
   3,
   3,
   [
     {
       id: 1,
       style: {
-        gridRowStart: 2,
-      },
+        gridColumnStart: 'span 2',
+        gridRowStart: 2
+      }
     },
     {
       id: 2,
       style: {
-        gridColumnStart: 'span 2',
-        gridRowEnd: 'span 2',
-      },
+        gridColumnStart: 2,
+        gridColumnEnd: 'span 2'
+      }
     },
     {
-      id: 3,
+      id: 3
     },
     {
-      id: 4,
+      id: 4
     },
     {
-      id: 5,
-    },
+      id: 5
+    }
   ]
-)));
+));
 
