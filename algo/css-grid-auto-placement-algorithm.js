@@ -110,11 +110,12 @@ function getSizing(item, { currentRow, currentColumn, rows, columns }) {
       console.warn(`sizing, explict row start and end, ignore row span setting`);
     }
   } else {
-    rowEnd = rowStart + rowSpan;
+    rowEnd = rowStart + rowSpan - 1;
   }
   if (!isNaN(gridColumnEnd)) {
     if (isNaN(gridColumnStart)) {
-      columnStart = gridColumnEnd - columnSpan - 1;
+      columnEnd = gridColumnEnd - 1;
+      columnStart = columnEnd - columnSpan + 1;
     } else if (columnSpan > 1) {
       console.warn(`sizing, explict column start and end, ignore column span setting`);
     }
@@ -170,18 +171,19 @@ function putItem(result, item, currentPosition, sizing, inRecursion = 0, forceUp
   }
   let pointColumnEnd = pointColumnStart + columnSpan - 1;
   let pointRowEnd = pointRowStart + rowSpan - 1;
-  !inRecursion && console.group(item.id);
-  console.info(`auto placement, try to put `, item, ` at ${pointRowStart}, ${pointColumnStart}, and sizing is`, sizing);
+  console.group(item.id);
+  console.info(`auto placement, try to put `, item, ` at ${pointRowStart}, ${pointColumnStart}, and sizing is`, sizing,
+    `in while (${pointRowStart}, ${pointRowEnd}), (${pointColumnStart}, ${pointColumnEnd})`);
   let resultCopy = JSON.parse(JSON.stringify(result));
   let isFirst = true;
-  if (pointColumnEnd > columns && !isFixedColumn && !isFixedRow && !inRecursion) {
+  if (pointColumnEnd > columns && !isFixedColumn && !isFixedRow) {
     let newPoint = {
       currentColumn: 1,
       currentRow: pointRowStart + 1
     };
-    console.info(`\u002b[1;33m auto placement before while, not enough placement, move to right is first`, isFirst, item, newPoint, `recursion ${inRecursion}`);
+    console.info(`\u001b[1;35m auto placement before while, not enough placement, move to right is first`, isFirst, item, newPoint, `recursion ${inRecursion}`);
     resultCopy = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, inRecursion++).result;
-    // console.groupEnd();
+    console.groupEnd();
   } else {
 
     while(pointRowStart <= pointRowEnd) {
@@ -209,14 +211,18 @@ function putItem(result, item, currentPosition, sizing, inRecursion = 0, forceUp
                 `in while (${pointRowStart}, ${pointRowEnd}), (${pointColumnStart}, ${pointColumnEnd})`
                 );
               
-              resultCopy = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, ++inRecursion).result;
-              // console.groupEnd();
-              break;
+              resultCopy = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, inRecursion + 1).result;
+              console.groupEnd();
+              return {
+                result: resultCopy,
+                pointRowStart: currentPosition.currentRow,
+                pointColumnStart: currentPosition.currentColumn,
+              };
             } else {
               // fixed row
               let cantMoveRight = pointColumnStart + columnSpan - 1 === columns;
               let newPoint = {
-                currentColumn: pointColumnStart === columns && !cantMoveRight ? 1 : ++pointColumnStart,
+                currentColumn: pointColumnStart === columns && !cantMoveRight ? 1 : pointColumnStart + 1,
                 currentRow: pointRowStart,
               };
               if (!isFirst) {
@@ -227,8 +233,12 @@ function putItem(result, item, currentPosition, sizing, inRecursion = 0, forceUp
               }
               console.info(`auto placement, not enough placement, move to right`, item, cantMoveRight, newPoint);
               resultCopy = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true).result;
-              // console.groupEnd();
-              break;
+              console.groupEnd();
+              return {
+                result: resultCopy,
+                pointRowStart: currentPosition.currentRow,
+                pointColumnStart: currentPosition.currentColumn,
+              };
             }
           } else if (!isFixedRow) {
             let newPoint = {
@@ -243,13 +253,17 @@ function putItem(result, item, currentPosition, sizing, inRecursion = 0, forceUp
             }
             console.info(`auto placement, not enough placement, move to down`, item, newPoint);
             resultCopy = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true).result;
-            // console.groupEnd();
-            break;
+            console.groupEnd();
+            return {
+              result: resultCopy,
+              pointRowStart: currentPosition.currentRow,
+              pointColumnStart: currentPosition.currentColumn,
+            };
           }
         } else {
           isFirst = false;
           resultCopy[pointRowStart - 1][pointColumnStart - 1] = item;
-          console.log(`putitem, `, item, `at ${pointRowStart}, ${pointColumnStart} of `, JSON.parse(JSON.stringify(resultCopy)));
+          console.log(`putitem, `, item, `at ${pointRowStart}, ${pointColumnStart} of `, JSON.parse(JSON.stringify(resultCopy)), `recursion ${inRecursion}`);
           pointColumnStart++;
         }
       }
@@ -267,32 +281,45 @@ function putItem(result, item, currentPosition, sizing, inRecursion = 0, forceUp
 }
 
 console.log(layout(
-  3,
-  3,
+  4,
+  4,
   [
     {
       id: 1,
       style: {
-        gridColumnStart: 'span 2',
-        gridRowStart: 2
-      }
+        gridRowEnd: 'span 2',
+      },
     },
     {
       id: 2,
       style: {
-        gridColumnStart: 2,
-        gridColumnEnd: 'span 2'
+        gridRowStart: 2,
+      },
+    },
+    {
+      id: 3,
+    },
+    {
+      id: 4,
+    },
+    {
+      id: 5,
+      style: {
+        gridRowStart:  'span 2',
+      },
+    },
+    {
+      id: 6,
+    },
+    {
+      id: 7,
+      style: {
+        gridColumnStart:  'span 3'
       }
     },
     {
-      id: 3
+      id: 8,
     },
-    {
-      id: 4
-    },
-    {
-      id: 5
-    }
   ]
 ));
 
