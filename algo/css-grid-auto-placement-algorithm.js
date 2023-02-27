@@ -24,7 +24,8 @@ function layout(rows, columns, items) {
   // render
   let currentColumn = 1;
   let currentRow = 1;
-  items.forEach(item => {
+  let prevRowPoint;
+  items.forEach((item, index) => {
     let sizing = getSizing(item, {
       currentRow, currentColumn, rows, columns
     });
@@ -43,6 +44,12 @@ function layout(rows, columns, items) {
       isFixedRow,
       isFixedColumn,
     } = sizing;
+    // if (prevRowPoint && items[index].isFixedRow && !items[index].isFixedColumn) {
+    //     // explicitly set row position but not set column position to be placed before any other similarly positioned item in that specific row
+    //     currentColumn = prevRowPoint.columnStart;
+    //     currentRow = prevPoint.rowStart;
+    //     console.log(`\u001b[1;31m auto placement start, current is fixed row but not fixed column update point to (${currentRow}, ${currentColumn})`);
+    //   }
     let nextPoint = putItem(JSON.parse(JSON.stringify(result)), item, { currentColumn, currentRow }, sizing)
     // if (!isFixedColumn || (isFixedColumn && currentColumn === columnStart)) {
     //   // move point
@@ -56,10 +63,20 @@ function layout(rows, columns, items) {
     if (!isFixedColumn && !isFixedRow) {
       currentColumn = nextPoint.pointColumnStart;
       currentRow = nextPoint.pointRowStart;
-    } else if (isFixedColumn) {
+      console.info(`\u001b[1;31m auto placement end, update point to (${currentRow}, ${currentColumn}) by fixed both`);
+    } else if (!isFixedRow) {
       currentColumn = nextPoint.pointColumnStart;
-    // } else if (isFixedRow) {
-    //   currentRow = nextPoint.pointRowStart;
+      console.info(`\u001b[1;31m auto placement end, update point to (${currentRow}, ${currentColumn}) by not fixed row`);
+    } else if (isFixedRow) {
+      prevRowPoint = {
+        rowStart: nextPoint.pointRowStart,
+        columnStart: nextPoint.pointColumnStart
+      };
+    }
+    if (nextPoint.pointColumnStart === columns && !isFixedColumn) {
+      currentRow = nextPoint.pointRowStart + 1;
+      currentColumn = 1;
+      console.info(`\u001b[1;31m auto placement end, update point to (${currentRow}, ${currentColumn}) by column end`);
     }
   });
   // fill 0
@@ -104,20 +121,21 @@ function getSizing(item, { currentRow, currentColumn, rows, columns }) {
   rowStart = !isNaN(gridRowStart) ? gridRowStart : currentRow;
   columnStart = !isNaN(gridColumnStart) ? gridColumnStart : currentColumn;
   if (!isNaN(gridRowEnd)) {
+    rowEnd = gridRowEnd - 1;
     if (isNaN(gridRowStart)) {
-      rowStart = gridRowEnd - rowSpan - 1;
-    } else if (rowSpan > 1) {
-      console.warn(`sizing, explict row start and end, ignore row span setting`);
+      rowStart = gridRowEnd - rowSpan;
+    } else {
+      rowSpan = gridRowEnd - gridRowStart;
     }
   } else {
     rowEnd = rowStart + rowSpan - 1;
   }
   if (!isNaN(gridColumnEnd)) {
+    columnEnd = gridColumnEnd - 1;
     if (isNaN(gridColumnStart)) {
-      columnEnd = gridColumnEnd - 1;
-      columnStart = columnEnd - columnSpan + 1;
-    } else if (columnSpan > 1) {
-      console.warn(`sizing, explict column start and end, ignore column span setting`);
+      columnStart = gridColumnEnd - columnSpan;
+    } else {
+      columnSpan = gridColumnEnd - gridColumnStart
     }
   } else {
     columnEnd = columnStart + columnSpan - 1;
@@ -182,8 +200,9 @@ function putItem(result, item, currentPosition, sizing, inRecursion = 0, forceUp
       currentRow: pointRowStart + 1
     };
     console.info(`\u001b[1;35m auto placement before while, not enough placement, move to right is first`, isFirst, item, newPoint, `recursion ${inRecursion}`);
-    resultCopy = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, inRecursion++).result;
+    let resultDeep = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, inRecursion++);
     console.groupEnd();
+    return resultDeep;
   } else {
 
     while(pointRowStart <= pointRowEnd) {
@@ -211,13 +230,9 @@ function putItem(result, item, currentPosition, sizing, inRecursion = 0, forceUp
                 `in while (${pointRowStart}, ${pointRowEnd}), (${pointColumnStart}, ${pointColumnEnd})`
                 );
               
-              resultCopy = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, inRecursion + 1).result;
+              let resultDeep = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, inRecursion + 1);
               console.groupEnd();
-              return {
-                result: resultCopy,
-                pointRowStart: currentPosition.currentRow,
-                pointColumnStart: currentPosition.currentColumn,
-              };
+              return resultDeep;
             } else {
               // fixed row
               let cantMoveRight = pointColumnStart + columnSpan - 1 === columns;
@@ -232,13 +247,9 @@ function putItem(result, item, currentPosition, sizing, inRecursion = 0, forceUp
                 };;
               }
               console.info(`auto placement, not enough placement, move to right`, item, cantMoveRight, newPoint);
-              resultCopy = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true).result;
+              let resultDeep = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true);
               console.groupEnd();
-              return {
-                result: resultCopy,
-                pointRowStart: currentPosition.currentRow,
-                pointColumnStart: currentPosition.currentColumn,
-              };
+              return resultDeep;
             }
           } else if (!isFixedRow) {
             let newPoint = {
@@ -252,13 +263,9 @@ function putItem(result, item, currentPosition, sizing, inRecursion = 0, forceUp
               };;
             }
             console.info(`auto placement, not enough placement, move to down`, item, newPoint);
-            resultCopy = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true).result;
+            let resultDeep = putItem(!isFirst ? result : resultCopy, item, newPoint, sizing, true);
             console.groupEnd();
-            return {
-              result: resultCopy,
-              pointRowStart: currentPosition.currentRow,
-              pointColumnStart: currentPosition.currentColumn,
-            };
+            return resultDeep;
           }
         } else {
           isFirst = false;
@@ -275,8 +282,8 @@ function putItem(result, item, currentPosition, sizing, inRecursion = 0, forceUp
   console.groupEnd();
   return {
     result: resultCopy,
-    pointRowStart: pointRowEnd,
-    pointColumnStart: pointColumnEnd + 1,
+    pointRowStart: currentRow,
+    pointColumnStart: pointColumnEnd,
   }
 }
 
