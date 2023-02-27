@@ -25,6 +25,7 @@ function layout(rows, columns, items) {
   let currentColumn = 1;
   let currentRow = 1;
   let prevRowPoint;
+  let prevColumnPoint;
   items.forEach((item, index) => {
     let sizing = getSizing(item, {
       currentRow, currentColumn, rows, columns
@@ -50,6 +51,11 @@ function layout(rows, columns, items) {
     //     currentRow = prevPoint.rowStart;
     //     console.log(`\u001b[1;31m auto placement start, current is fixed row but not fixed column update point to (${currentRow}, ${currentColumn})`);
     //   }
+    if (prevColumnPoint && isFixedColumn && columnStart <= prevColumnPoint.columnStart) {
+      currentRow++;
+      currentColumn = 1;
+      console.log(`\u001b[1;31m auto placement start, current is fixed column but is less than prev column start so change to next line (${currentRow}, ${currentColumn})`);
+    }
     let nextPoint = putItem(JSON.parse(JSON.stringify(result)), item, { currentColumn, currentRow }, sizing)
     // if (!isFixedColumn || (isFixedColumn && currentColumn === columnStart)) {
     //   // move point
@@ -67,8 +73,15 @@ function layout(rows, columns, items) {
     } else if (!isFixedRow) {
       currentColumn = nextPoint.pointColumnStart;
       console.info(`\u001b[1;31m auto placement end, update point to (${currentRow}, ${currentColumn}) by not fixed row`);
-    } else if (isFixedRow) {
+    }
+    if (isFixedRow) {
       prevRowPoint = {
+        rowStart: nextPoint.pointRowStart,
+        columnStart: nextPoint.pointColumnStart
+      };
+    }
+    if (isFixedColumn) {
+      prevColumnPoint = {
         rowStart: nextPoint.pointRowStart,
         columnStart: nextPoint.pointColumnStart
       };
@@ -288,20 +301,18 @@ function putItem(result, item, currentPosition, sizing, inRecursion = 0, forceUp
 }
 
 console.log(layout(
-  4,
-  4,
+  3,
+  3,
   [
     {
       id: 1,
       style: {
-        gridRowEnd: 'span 2',
+        gridColumnStart: 'span 2',
+        gridColumnEnd: 4,
       },
     },
     {
       id: 2,
-      style: {
-        gridRowStart: 2,
-      },
     },
     {
       id: 3,
@@ -312,20 +323,9 @@ console.log(layout(
     {
       id: 5,
       style: {
-        gridRowStart:  'span 2',
+        gridColumnStart: 'span 2',
+        gridColumnEnd: 4,
       },
-    },
-    {
-      id: 6,
-    },
-    {
-      id: 7,
-      style: {
-        gridColumnStart:  'span 3'
-      }
-    },
-    {
-      id: 8,
     },
   ]
 ));
