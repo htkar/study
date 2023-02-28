@@ -45,18 +45,18 @@ function layout(rows, columns, items) {
       isFixedRow,
       isFixedColumn,
     } = sizing;
-    // if (prevRowPoint && items[index].isFixedRow && !items[index].isFixedColumn) {
-    //     // explicitly set row position but not set column position to be placed before any other similarly positioned item in that specific row
-    //     currentColumn = prevRowPoint.columnStart;
-    //     currentRow = prevPoint.rowStart;
-    //     console.log(`\u001b[1;31m auto placement start, current is fixed row but not fixed column update point to (${currentRow}, ${currentColumn})`);
-    //   }
-    if (prevColumnPoint && isFixedColumn && columnStart <= prevColumnPoint.columnStart) {
-      currentRow++;
-      currentColumn = 1;
-      console.log(`\u001b[1;31m auto placement start, current is fixed column but is less than prev column start so change to next line (${currentRow}, ${currentColumn})`);
+    let point = { currentColumn, currentRow };
+    if (prevRowPoint && isFixedRow && columnStart <= prevColumnPoint.columnStart && currentRow === prevRowPoint.rowStart) {
+        // explicitly set row position but not set column position to be placed before any other similarly positioned item in that specific row
+        point.currentColumn = prevRowPoint.columnStart;
+        console.log(`\u001b[1;31m auto placement start, current is fixed row but not fixed column update point to `, point);
+      }
+    if (prevColumnPoint && isFixedColumn && columnStart <= prevColumnPoint.columnStart && currentRow === prevColumnPoint.rowStart) {
+      point.currentRow = currentRow + 1;
+      point.currentColumn = 1;
+      console.log(`\u001b[1;31m auto placement start, current is fixed column but is less than prev column start so change to next line `, point);
     }
-    let nextPoint = putItem(JSON.parse(JSON.stringify(result)), item, { currentColumn, currentRow }, sizing)
+    let nextPoint = putItem(JSON.parse(JSON.stringify(result)), item, point, sizing);
     // if (!isFixedColumn || (isFixedColumn && currentColumn === columnStart)) {
     //   // move point
     //   currentColumn = nextPoint.pointColumnStart;
@@ -69,10 +69,11 @@ function layout(rows, columns, items) {
     if (!isFixedColumn && !isFixedRow) {
       currentColumn = nextPoint.pointColumnStart;
       currentRow = nextPoint.pointRowStart;
-      console.info(`\u001b[1;31m auto placement end, update point to (${currentRow}, ${currentColumn}) by fixed both`);
+      console.info(`\u001b[1;34m auto placement end, update point to (${currentRow}, ${currentColumn}) by fixed both`);
     } else if (!isFixedRow) {
       currentColumn = nextPoint.pointColumnStart;
-      console.info(`\u001b[1;31m auto placement end, update point to (${currentRow}, ${currentColumn}) by not fixed row`);
+      currentRow = nextPoint.pointRowStart;
+      console.info(`\u001b[1;34m auto placement end, update point to (${currentRow}, ${currentColumn}) by not fixed row`);
     }
     if (isFixedRow) {
       prevRowPoint = {
@@ -86,11 +87,11 @@ function layout(rows, columns, items) {
         columnStart: nextPoint.pointColumnStart
       };
     }
-    if (nextPoint.pointColumnStart === columns && !isFixedColumn) {
-      currentRow = nextPoint.pointRowStart + 1;
-      currentColumn = 1;
-      console.info(`\u001b[1;31m auto placement end, update point to (${currentRow}, ${currentColumn}) by column end`);
-    }
+    // if (nextPoint.pointColumnStart === columns && !isFixedColumn) {
+    //   currentRow = nextPoint.pointRowStart + 1;
+    //   currentColumn = 1;
+    //   console.info(`\u001b[1;34m auto placement end, update point to (${currentRow}, ${currentColumn}) by column end`);
+    // }
   });
   // fill 0
   for (let row = 0; row < rows; row++) {
@@ -307,12 +308,14 @@ console.log(layout(
     {
       id: 1,
       style: {
-        gridColumnStart: 'span 2',
-        gridColumnEnd: 4,
+        gridRowEnd: 'span 2',
       },
     },
     {
       id: 2,
+      style: {
+        gridRowStart: 2,
+      },
     },
     {
       id: 3,
@@ -322,10 +325,6 @@ console.log(layout(
     },
     {
       id: 5,
-      style: {
-        gridColumnStart: 'span 2',
-        gridColumnEnd: 4,
-      },
     },
   ]
 ));
